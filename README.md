@@ -19,6 +19,53 @@ A análise dos dados revelou insights sobre o comportamento de pedidos:
 
 ---
 
+## 📸 Telas do Dashboard (Prints)
+
+Aqui estão as demonstrações visuais das diversas funcionalidades do dashboard:
+
+### 🏠 Visão Geral & Menus
+<p align="center">
+  <img src="imagens/menu_lateral.png" width="30%" alt="Menu Lateral"/>
+  <img src="imagens/visao_geral.png" width="45%" alt="Visão Geral"/>
+  <br>
+  <img src="imagens/resumo_numerico.png" width="45%" alt="Resumo Numérico"/>
+  <img src="imagens/menu_central_informacoes.png" width="45%" alt="Menu Central"/>
+</p>
+
+### 📊 Gráficos e Análises Detalhadas
+<p align="center">
+  <img src="imagens/analise_detalhada_tipos_barras_horiz.png" width="45%" alt="Barras Horizontais"/>
+  <img src="imagens/analise_detalhada_tipos_barras_vert.png" width="45%" alt="Barras Verticais"/>
+  <br>
+  <img src="imagens/analise_detalhada_tipos_pizza.png" width="45%" alt="Gráfico de Pizza"/>
+  <img src="imagens/analise_detalhada_tipos_donuts.png" width="45%" alt="Gráfico de Donut"/>
+  <br>
+  <img src="imagens/analise_detalhada_tipos_funil.png" width="45%" alt="Gráfico de Funil"/>
+  <img src="imagens/analise_detalhada_tipos_arvore_mapa.png" width="45%" alt="Mapa de Árvore (Treemap)"/>
+</p>
+
+### 📈 Análise Temporal
+<p align="center">
+  <img src="imagens/status_temporal_periodo.png" width="45%" alt="Status por Período"/>
+  <img src="imagens/tendencia_e_rodapé.png" width="45%" alt="Tendência e Rodapé"/>
+  <br>
+  <img src="imagens/analise_temporal_dia_semanal_mensal.png" width="45%" alt="Análise Temporal (Dia/Semana/Mês)"/>
+  <img src="imagens/analise_temporal_dia_semanal_mensal_anual.png" width="45%" alt="Análise Temporal Expandida"/>
+</p>
+
+### 🗺️ Mapas Geográficos
+<p align="center">
+  <img src="imagens/visualizacao_mapa_whitetheme.png" width="45%" alt="Mapa - Tema Claro"/>
+  <img src="imagens/visualizacao_mapa_darktheme.png" width="45%" alt="Mapa - Tema Escuro"/>
+</p>
+
+### 📋 Exportação e Dados Brutos
+<p align="center">
+  <img src="imagens/dados_brutos_opcao_exportar.png" width="80%" alt="Visualização e Exportação de Dados Brutos"/>
+</p>
+
+---
+
 ## 🛠️ Bibliotecas Utilizadas
 
 | Biblioteca | Versão | Finalidade |

@@ -15,7 +15,7 @@ def main():
 
     df = buscar_dados_api()
 
-    print("📊 Preview:")
+    print("📊 Preview:1 ")
     print(df.head())
 
 

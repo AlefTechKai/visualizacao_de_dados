@@ -15,10 +15,11 @@ def main():
 
     df = buscar_dados_api()
 
-    print("📊 Preview:1 ")
+    print("📊 Preview:1")
     print(df.head())
 
 
 if __name__ == "__main__":
     main()
+    
     

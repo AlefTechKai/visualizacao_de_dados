@@ -100,8 +100,7 @@ visualizacao_de_dados/
 │
 ├── funcoes/
 │   ├── __init__.py
-│   ├── api.py                      # Busca dados via CSV/URL (anfíbio)
-│   └── funcoes_gerais.py           # Busca dados via SQL (anfíbio)
+│   └── api.py                      # Busca dados via CSV/URL (anfíbio)
 │
 ├── db/
 │   ├── __init__.py

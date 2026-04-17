@@ -21,47 +21,35 @@ A análise dos dados revelou insights sobre o comportamento de pedidos:
 
 ## 📸 Telas do Dashboard (Prints)
 
-Aqui estão as demonstrações visuais das diversas funcionalidades do dashboard:
+Aqui estão as demonstrações visuais das diversas funcionalidades do dashboard atualizado:
 
-### 🏠 Visão Geral & Menus
+### 🏠 Visão Geral & Filtros
 <p align="center">
-  <img src="imagens/menu_lateral.png" width="30%" alt="Menu Lateral"/>
-  <img src="imagens/visao_geral.png" width="45%" alt="Visão Geral"/>
+  <img src="imagens/menu_lateral.png" width="30%" alt="Menu Lateral Premium"/>
+  <img src="imagens/filtros_globais.png" width="30%" alt="Filtros Globais de Status e Ano"/>
   <br>
-  <img src="imagens/resumo_numerico.png" width="45%" alt="Resumo Numérico"/>
-  <img src="imagens/menu_central_informacoes.png" width="45%" alt="Menu Central"/>
+  <img src="imagens/menu_principal.png" width="80%" alt="Dashboard Visão Executiva e KPIs Modernos"/>
 </p>
 
-### 📊 Gráficos e Análises Detalhadas
+### 📊 Análise de Produtos e Rank
 <p align="center">
-  <img src="imagens/analise_detalhada_tipos_barras_horiz.png" width="45%" alt="Barras Horizontais"/>
-  <img src="imagens/analise_detalhada_tipos_barras_vert.png" width="45%" alt="Barras Verticais"/>
-  <br>
-  <img src="imagens/analise_detalhada_tipos_pizza.png" width="45%" alt="Gráfico de Pizza"/>
-  <img src="imagens/analise_detalhada_tipos_donuts.png" width="45%" alt="Gráfico de Donut"/>
-  <br>
-  <img src="imagens/analise_detalhada_tipos_funil.png" width="45%" alt="Gráfico de Funil"/>
-  <img src="imagens/analise_detalhada_tipos_arvore_mapa.png" width="45%" alt="Mapa de Árvore (Treemap)"/>
+  <img src="imagens/ranking_heatmap.png" width="80%" alt="Ranking de Vendas e Heatmap de Estados"/>
 </p>
 
 ### 📈 Análise Temporal
 <p align="center">
-  <img src="imagens/status_temporal_periodo.png" width="45%" alt="Status por Período"/>
-  <img src="imagens/tendencia_e_rodapé.png" width="45%" alt="Tendência e Rodapé"/>
-  <br>
-  <img src="imagens/analise_temporal_dia_semanal_mensal.png" width="45%" alt="Análise Temporal (Dia/Semana/Mês)"/>
-  <img src="imagens/analise_temporal_dia_semanal_mensal_anual.png" width="45%" alt="Análise Temporal Expandida"/>
+  <img src="imagens/faturamento_temporal.png" width="45%" alt="Evolução Temporal em Área"/>
+  <img src="imagens/faturamento_temporal_colunas.png" width="45%" alt="Evolução Temporal em Colunas"/>
 </p>
 
-### 🗺️ Mapas Geográficos
+### 🗺️ Dispersão Geográfica
 <p align="center">
-  <img src="imagens/visualizacao_mapa_whitetheme.png" width="45%" alt="Mapa - Tema Claro"/>
-  <img src="imagens/visualizacao_mapa_darktheme.png" width="45%" alt="Mapa - Tema Escuro"/>
+  <img src="imagens/mapa_hotgeo.png" width="80%" alt="Mapa de Calor Olist (Carto-Darkmatter)"/>
 </p>
 
-### 📋 Exportação e Dados Brutos
+### 📋 Exportação e Dados Brutos (.csv / .sql)
 <p align="center">
-  <img src="imagens/dados_brutos_opcao_exportar.png" width="80%" alt="Visualização e Exportação de Dados Brutos"/>
+  <img src="imagens/funcao_export.png" width="80%" alt="Engine de Extração Paginada e Toggle SQL/CSV"/>
 </p>
 
 ---
@@ -173,15 +161,14 @@ python main.py
 
 | Funcionalidade | Descrição |
 |---|---|
-| 📊 **Visão Geral** | KPIs, gráfico de pizza/donut e ranking de status |
-| 📦 **Análise de Status** | 6 tipos de gráfico selecionáveis (barras, pizza, donut, treemap, funil) |
-| 📍 **Mapa Geográfico** | Mapa interativo com estilo claro/escuro |
-| 📅 **Histórico Temporal** | Linha do tempo com granularidade diária/semanal/mensal |
-| 📋 **Dados Brutos** | Explorador de dados com pesquisa e seleção de colunas |
-| 🎛️ **Filtros** | Filtro por status e toggle de período |
-| ⬇️ **Download CSV** | Exportação dos dados filtrados |
-| 🔄 **Recarregar Dados** | Limpa o cache e busca dados atualizados |
-| 🎨 **Temas** | 3 paletas de cor selecionáveis por botão |
+| 📊 **Visão Geral** | KPIs dinâmicos, ranking de cidades por faturamento e análise de status |
+| 📦 **Visualização Dinâmica** | Alternância em tempo real entre gráficos de Barras, Pizza, Donut, Treemap e Funil |
+| 📍 **Dispersão Geográfica** | Mapa de Calor de vendas utilizando as geolocalizações originais |
+| 📅 **Histórico Temporal** | Linha do tempo com opções de visualização (Área, Linhas ou Colunas) 100% cronológica |
+| 📋 **Dados Brutos (Exportação)** | Painel massivo paginado com opção de renomear colunas dinamicamente |
+| 🎛️ **Filtros Avançados** | Filtros globais por Status, Estado e filtro de Ano de análise |
+| ⬇️ **Exportação Massiva** | Download otimizado e paginado para `.csv` ou scripts `.sql` gerados automaticamente |
+| 🎨 **Design Moderno** | Interface premium com *Glassmorphism*, gradientes vibrantes e visual não-opaco |
 
 ---
 
@@ -210,6 +197,6 @@ streamlit run app.py
 
 ## 👨‍💻 Desenvolvido por
 
-**Alef B.R.** — com auxílio do Opus 4.6 (Thinking)
+**Alef Barbosa** — com auxílio do Opus 4.6 (Thinking)
 
-Feito com ❤️ usando Streamlit & Plotly
+Feito com ❤️ e matplotly

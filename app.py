@@ -2,63 +2,74 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-
-from funcoes.api import buscar_dados_api
-
+import os
+from db.conexao_db import get_engine
 
 # =========================
 # CONFIGURAÇÃO DA PÁGINA
 # =========================
 st.set_page_config(
-    page_title="Dashboard de Pedidos",
-    page_icon="📊",
+    page_title="Olist Analytics Dashboard",
+    page_icon="🇧🇷",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-
 # =========================
-# CSS PERSONALIZADO (arquivo externo)
+# CSS PERSONALIZADO (arquivo externo ou embutido fallback)
 # =========================
 import pathlib
-
 css_path = pathlib.Path(__file__).parent / "src" / "css" / "style.css"
-with open(css_path, encoding="utf-8") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-
+if css_path.exists():
+    with open(css_path, encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+else:
+    # Fallback CSS minimal + Dashboard elements
+    st.markdown("""
+        <style>
+            .kpi-container { display: flex; gap: 15px; margin-bottom: 2rem; justify-content: space-between; flex-wrap: wrap;}
+            .kpi-card { background: #1f1c2c; padding: 2.5rem 1.5rem; min-height: 150px; display: flex; flex-direction: column; justify-content: center; border-radius: 12px; flex: 1; text-align: center; border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-width: 200px;}
+            .kpi-value { font-size: 2.2rem; font-weight: 800; margin-top: 10px; }
+            .kpi-label { font-size: 1rem; color: #a0a0a0; text-transform: uppercase; letter-spacing: 1px;}
+            .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 2rem;}
+        </style>
+    """, unsafe_allow_html=True)
 
 # =========================
-# CARREGAR DADOS
+# CARREGAR DADOS V2 (Master Join .sql com Engine SQLAlchemy)
 # =========================
 @st.cache_data(ttl=600)
 def load_data():
-    df = buscar_dados_api()
+    caminho_sql = os.path.join(os.path.dirname(__file__), "db", "queries", "query_informacoes.sql")
+    
+    with open(caminho_sql, "r", encoding="utf-8") as f:
+        query = f.read()
 
-    # Corrigir decimal com vírgula -> ponto
-    for col in ["customer_lat", "customer_lng", "seller_lat", "seller_lng"]:
-        if col in df.columns:
-            df[col] = (
-                df[col]
-                .astype(str)
-                .str.replace(",", ".")
-                .astype(float)
-            )
+    # Em vez de pymysql raw, puxamos a super-engine
+    engine = get_engine()
+    
+    # O sqlalchemy tem controle automatico de pooling, nao precisamos de bloco try/finally pra dar close manually()
+    df = pd.read_sql(query, con=engine)
 
-    # Converter timestamps
+    # Preencher Valores Nulos em Financeiro caso existam nos JOINs
+    if "total_valor_produtos" in df.columns:
+        df["total_valor_produtos"] = df["total_valor_produtos"].fillna(0.0)
+    if "total_valor_frete" in df.columns:
+        df["total_valor_frete"] = df["total_valor_frete"].fillna(0.0)
+
+    # Converter timestamps Core Olist
     if "order_purchase_timestamp" in df.columns:
         df["order_purchase_timestamp"] = pd.to_datetime(df["order_purchase_timestamp"], errors="coerce")
 
-    if "order_delivered_customer_date" in df.columns:
-        df["order_delivered_customer_date"] = pd.to_datetime(df["order_delivered_customer_date"], errors="coerce")
-
-    if "order_estimated_delivery_date" in df.columns:
-        df["order_estimated_delivery_date"] = pd.to_datetime(df["order_estimated_delivery_date"], errors="coerce")
+    # Converter Geo (Lat/Lng) e forcar clean
+    for col in ["customer_lat", "customer_lng"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace(",", ".").astype(float)
 
     return df
 
-
-df = load_data()
+with st.spinner("Conectando ao MySQL e rodando Query Master Olist..."):
+    df = load_data()
 
 
 # =========================
@@ -69,7 +80,6 @@ COLORS = [
     "#4facfe", "#00f2fe", "#43e97b", "#38f9d7",
     "#fa709a", "#fee140", "#a18cd1", "#fbc2eb",
 ]
-
 PLOTLY_TEMPLATE = "plotly_dark"
 
 
@@ -80,144 +90,119 @@ with st.sidebar:
     st.markdown("""
     <div style="
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.2rem 1.5rem;
+        padding: 1.5rem;
         border-radius: 14px;
-        margin-bottom: 1rem;
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        margin-bottom: 2rem;
         text-align: center;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        border: 1px solid rgba(255,255,255,0.1);
     ">
-        <div style="font-size: 2.5rem;">🚀</div>
-        <div style="color: #fff; font-size: 1.2rem; font-weight: 500; margin-top: 0.2rem;">Navegação</div>
+        <div style="font-size: 3rem; margin-bottom:10px;">🛍️</div>
+        <div style="color: #fff; font-size: 1.4rem; font-weight: bold; letter-spacing: 1px;">Olist Analytics</div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("---")
     
     pagina = st.selectbox(
-        "📂 Selecione a visualização",
+        "📂 Menu de Visualizações",
         options=[
-            "🏠 Visão Geral",
-            "📦 Análise de Status",
-            "📍 Mapa Geográfico",
-            "📅 Histórico Temporal",
-            "📋 Dados Brutos"
+            "🏠 Visão Executiva",
+            "📈 Análise de Produtos",
+            "📍 Dispersão Geográfica",
+            "📋 Exportação de Dados"
         ],
-        index=0,
-        help="Escolha qual seção do dashboard deseja visualizar"
+        index=0
     )
 
     st.markdown("---")
-    st.markdown("## 🎛️ Filtros")
+    st.markdown("## 🎛️ Filtros Globais")
 
-    # Filtro de Status
-    todos_status = sorted(df["order_status"].unique().tolist())
+    # Filtro Status Principal
+    todos_status = sorted(df["order_status"].dropna().unique().tolist())
     status_selecionados = st.multiselect(
-        "📌 Filtrar por Status",
+        "📌 Status do Pedido",
         options=todos_status,
         default=[],
-        help="Deixe vazio para ver todos. Selecione para filtrar."
+        help="Deixe vazio para filtrar todo o fluxo."
     )
 
-    # Filtro de Data (com toggle)
-    if "order_purchase_timestamp" in df.columns and df["order_purchase_timestamp"].notna().any():
-        filtrar_periodo = st.toggle("📆 Filtrar por Período", value=False)
-
-        if filtrar_periodo:
-            datas_validas = df["order_purchase_timestamp"].dropna()
-            data_min = datas_validas.min().date()
-            data_max = datas_validas.max().date()
-
-            col_d1, col_d2 = st.columns(2)
-            with col_d1:
-                data_inicio = st.date_input("De", value=data_min, min_value=data_min, max_value=data_max)
-            with col_d2:
-                data_fim = st.date_input("Até", value=data_max, min_value=data_min, max_value=data_max)
-        else:
-            data_inicio = None
-            data_fim = None
+    # Filtro Dinâmico de Cidades
+    if "customer_state" in df.columns:
+        top_estados = df["customer_state"].value_counts().index.tolist()
+        estado_selecionados = st.multiselect(
+            "🌆 Estados",
+            options=sorted(top_estados),
+            default=[]
+        )
     else:
-        data_inicio = None
-        data_fim = None
+        estado_selecionados = []
 
-    st.markdown("---")
+    # Filtro Dinâmico de Ano
+    if "order_purchase_timestamp" in df.columns:
+        anos = sorted(df["order_purchase_timestamp"].dt.year.dropna().unique().astype(int).tolist())
+        ano_selecionado = st.selectbox("📅 Filtrar por Ano", options=["Todos"] + anos, index=0)
+    else:
+        ano_selecionado = "Todos"
 
-    # Botão de recarregar
-    if st.button("🔄 Recarregar Dados", width="stretch", type="primary"):
-        st.cache_data.clear()
-        st.rerun()
 
-    st.markdown(
-        "<div style='text-align:center; color: rgba(180,180,210,0.5); font-size:0.75rem; margin-top: 100px;'>"
-        "Dashboard v2.0<br>Feito com ❤️ e Streamlit"
-        "</div>",
-        unsafe_allow_html=True
-    )
 
+    # Rodapé do Menu Lateral
+    st.markdown("""
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); width: 100%; text-align: center; color: #a0a0a0; font-size: 0.9rem;">
+        Feito com ❤️ e matplotly
+    </div>
+    """, unsafe_allow_html=True)
 
 # =========================
 # APLICAR FILTROS
 # =========================
-# Se nenhum status selecionado → mostra TODOS os dados
-if status_selecionados:
-    df_filtrado = df[df["order_status"].isin(status_selecionados)].copy()
-else:
-    df_filtrado = df.copy()
+df_filtrado = df.copy()
 
-if data_inicio and data_fim and "order_purchase_timestamp" in df_filtrado.columns:
-    mask = (
-        (df_filtrado["order_purchase_timestamp"].dt.date >= data_inicio) &
-        (df_filtrado["order_purchase_timestamp"].dt.date <= data_fim)
-    )
-    df_filtrado = df_filtrado[mask]
+if status_selecionados:
+    df_filtrado = df_filtrado[df_filtrado["order_status"].isin(status_selecionados)]
+
+if estado_selecionados:
+    df_filtrado = df_filtrado[df_filtrado["customer_state"].isin(estado_selecionados)]
+
+if ano_selecionado != "Todos" and "order_purchase_timestamp" in df.columns:
+    df_filtrado = df_filtrado[df_filtrado["order_purchase_timestamp"].dt.year == ano_selecionado]
 
 
 # =========================
-# HEADER
+# HEADER E KPIS
 # =========================
 st.markdown("""
-<div class="dashboard-header">
-    <h1>📊 Dashboard de Análise de Pedidos</h1>
-    <p>Análise completa e interativa dos seus dados de pedidos em tempo real</p>
+<div style="margin-bottom: 10px;">
+    <h1 style='margin-bottom:5px; font-weight:800; font-size: 2.8rem;'>📊 Master Dashboard Olist</h1>
+    <p style='color: #888; font-size: 1.1rem;'>Análise Focada do fluxo de Join Principal extraído do seu Banco (Pedidos -> Receita -> Geo)</p>
 </div>
 """, unsafe_allow_html=True)
 
-
-# =========================
-# KPIs (sempre visíveis)
-# =========================
+# Cálculo de Métricas Focadas em Business
 total_pedidos = len(df_filtrado)
-status_mais_comum = df_filtrado["order_status"].value_counts().idxmax() if not df_filtrado.empty else "N/A"
-qtd_status = df_filtrado["order_status"].nunique() if not df_filtrado.empty else 0
-
-# Calcular pedidos entregues
-pedidos_entregues = len(df_filtrado[df_filtrado["order_status"] == "delivered"]) if not df_filtrado.empty else 0
-taxa_entrega = f"{(pedidos_entregues / total_pedidos * 100):.1f}%" if total_pedidos > 0 else "0%"
+faturamento_total = df_filtrado["total_valor_produtos"].sum() if not df_filtrado.empty else 0
+frete_total = df_filtrado["total_valor_frete"].sum() if not df_filtrado.empty else 0
+ticket_medio = (faturamento_total / total_pedidos) if total_pedidos > 0 else 0
 
 st.markdown(f"""
 <div class="kpi-container">
-    <div class="kpi-card kpi-1" align="center">
-        <div class="kpi-icon">📦</div>
+    <div class="kpi-card kpi-1">
+        <div class="kpi-label">Volume de Pedidos</div>
         <div class="kpi-value">{total_pedidos:,}</div>
-        <div class="kpi-label">Total de Pedidos</div>
     </div>
-    <div class="kpi-card kpi-2" align="center">
-        <div class="kpi-icon">🏆</div>
-        <div class="kpi-value">{status_mais_comum}</div>
-        <div class="kpi-label">Status Mais Comum</div>
+    <div class="kpi-card kpi-2">
+        <div class="kpi-label">Faturamento Total Bruto</div>
+        <div class="kpi-value">R$ {faturamento_total:,.2f}</div>
     </div>
-    <div class="kpi-card kpi-3" align="center">
-        <div class="kpi-icon">🏷️</div>
-        <div class="kpi-value">{qtd_status}</div>
-        <div class="kpi-label">Status Únicos</div>
+    <div class="kpi-card kpi-3">
+        <div class="kpi-label">Ticket Médio por Pedido</div>
+        <div class="kpi-value">R$ {ticket_medio:,.2f}</div>
     </div>
-    <div class="kpi-card kpi-4" align="center">
-        <div class="kpi-icon">✅</div>
-        <div class="kpi-value">{taxa_entrega}</div>
-        <div class="kpi-label">Taxa de Entrega</div>
+    <div class="kpi-card kpi-4">
+        <div class="kpi-label">Custo Total Logística</div>
+        <div class="kpi-value">R$ {frete_total:,.2f}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-st.markdown("---")
 
 
 # ╔══════════════════════════════════════════╗
@@ -225,433 +210,278 @@ st.markdown("---")
 # ╚══════════════════════════════════════════╝
 
 # ─────────────────────────────────────
-# 🏠 VISÃO GERAL
+# 🏠 Visão Executiva
 # ─────────────────────────────────────
-if pagina == "🏠 Visão Geral":
-    st.markdown('<div class="section-title">🏠 Visão Geral do Dashboard</div>', unsafe_allow_html=True)
-
+if pagina == "🏠 Visão Executiva":
     col_a, col_b = st.columns(2)
 
     with col_a:
-        # Gráfico de pizza - Distribuição de status
         if not df_filtrado.empty:
-            status_counts = df_filtrado["order_status"].value_counts().reset_index()
-            status_counts.columns = ["status", "quantidade"]
-
-            fig_pizza = px.pie(
-                status_counts,
-                names="status",
-                values="quantidade",
-                title="🍕 Distribuição por Status",
-                color_discrete_sequence=COLORS,
-                hole=0.45,
-                template=PLOTLY_TEMPLATE,
-            )
-            fig_pizza.update_traces(
-                textposition="inside",
-                textinfo="percent+label",
-                hovertemplate="<b>%{label}</b><br>Qtd: %{value}<br>Porcentagem: %{percent}<extra></extra>"
-            )
-            fig_pizza.update_layout(
-                font=dict(family="Inter"),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-                margin=dict(t=60, b=80, l=20, r=20),
-                height=420,
-            )
-            st.plotly_chart(fig_pizza, width="stretch")
-
-    with col_b:
-        # Gráfico de barras horizontal - Top status
-        if not df_filtrado.empty:
-            status_counts = df_filtrado["order_status"].value_counts().reset_index()
-            status_counts.columns = ["status", "quantidade"]
+            st.markdown('<div class="section-title">🏆 Top Cidades em Faturamento</div>', unsafe_allow_html=True)
+            cidades_receita = df_filtrado.groupby('customer_city')['total_valor_produtos'].sum().reset_index()
+            cidades_receita = cidades_receita.sort_values(by='total_valor_produtos', ascending=False).head(10)
 
             fig_bar_h = px.bar(
-                status_counts.sort_values("quantidade"),
-                x="quantidade",
-                y="status",
+                cidades_receita.sort_values("total_valor_produtos"),
+                x="total_valor_produtos",
+                y="customer_city",
                 orientation="h",
-                title="📊 Ranking de Status",
-                color="quantidade",
-                color_continuous_scale=["#764ba2", "#667eea", "#4facfe", "#43e97b"],
+                color="total_valor_produtos",
+                color_continuous_scale="Purples",
                 template=PLOTLY_TEMPLATE,
             )
-            fig_bar_h.update_layout(
-                font=dict(family="Inter"),
-                coloraxis_showscale=False,
-                margin=dict(t=60, b=40, l=20, r=20),
-                height=420,
-                yaxis_title="",
-                xaxis_title="Quantidade",
-            )
-            fig_bar_h.update_traces(
-                hovertemplate="<b>%{y}</b><br>Quantidade: %{x}<extra></extra>"
-            )
+            fig_bar_h.update_layout(coloraxis_showscale=False, xaxis_title="Receita Gerada (R$)", yaxis_title="")
             st.plotly_chart(fig_bar_h, width="stretch")
 
-    # Linha do tempo resumida
+    with col_b:
+        if not df_filtrado.empty:
+            st.markdown('<div class="section-title">📊 Divisão de Status</div>', unsafe_allow_html=True)
+            status_counts = df_filtrado["order_status"].value_counts().reset_index()
+            status_counts.columns = ["status", "qtd"]
+
+            tipo_grafico_status = st.selectbox(
+                "Tipo de Gráfico",
+                ["Donut", "Pizza", "Barras", "Funil", "Treemap"],
+                label_visibility="collapsed"
+            )
+
+            if tipo_grafico_status == "Donut":
+                fig_status = px.pie(status_counts, names="status", values="qtd", hole=0.4, color_discrete_sequence=COLORS, template=PLOTLY_TEMPLATE)
+                fig_status.update_traces(textposition='inside', textinfo='percent+label')
+            elif tipo_grafico_status == "Pizza":
+                fig_status = px.pie(status_counts, names="status", values="qtd", hole=0, color_discrete_sequence=COLORS, template=PLOTLY_TEMPLATE)
+                fig_status.update_traces(textposition='inside', textinfo='percent+label')
+            elif tipo_grafico_status == "Barras":
+                fig_status = px.bar(status_counts, x="status", y="qtd", color="status", color_discrete_sequence=COLORS, template=PLOTLY_TEMPLATE)
+                fig_status.update_layout(xaxis_title="", yaxis_title="Quantidade")
+            elif tipo_grafico_status == "Funil":
+                fig_status = px.funnel(status_counts, x="qtd", y="status", color="status", color_discrete_sequence=COLORS, template=PLOTLY_TEMPLATE)
+            elif tipo_grafico_status == "Treemap":
+                fig_status = px.treemap(status_counts, path=["status"], values="qtd", template=PLOTLY_TEMPLATE, color="qtd", color_continuous_scale="Purples")
+                
+            st.plotly_chart(fig_status, width="stretch")
+
+    # Gráfico Temporal Vendas vs Meses
     if not df_filtrado.empty and "order_purchase_timestamp" in df_filtrado.columns:
-        st.markdown('<div class="section-title">📈 Tendência de Pedidos</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📅 Crescimento do Volume de Faturamento Físico</div>', unsafe_allow_html=True)
+        
+        tipo_graf_tempo = st.radio("Como deseja visualizar a evolução temporal?", ["Área", "Linhas", "Colunas"], horizontal=True)
 
-        timeline = (
-            df_filtrado
-            .dropna(subset=["order_purchase_timestamp"])
-            .groupby(df_filtrado["order_purchase_timestamp"].dt.to_period("M").astype(str))
-            .size()
-            .reset_index(name="qtd")
-        )
-        timeline.columns = ["mes", "qtd"]
+        df_temp = df_filtrado.dropna(subset=['order_purchase_timestamp']).copy()
+        df_temp['Mes_Ano'] = df_temp['order_purchase_timestamp'].dt.to_period("M").astype(str)
+        
+        vendas_tempo = df_temp.groupby('Mes_Ano')['total_valor_produtos'].sum().reset_index()
+        # Garante explicitamente a ordem natural do tempo (Esquerda para a Direita)
+        vendas_tempo = vendas_tempo.sort_values('Mes_Ano')
+        
+        if tipo_graf_tempo == "Área":
+            fig_area = px.area(vendas_tempo, x='Mes_Ano', y='total_valor_produtos', template=PLOTLY_TEMPLATE, color_discrete_sequence=["#4facfe"])
+            fig_area.update_traces(line=dict(width=3, color='#4facfe'), fillcolor="rgba(79, 172, 254, 0.3)")
+        elif tipo_graf_tempo == "Linhas":
+            fig_area = px.line(vendas_tempo, x='Mes_Ano', y='total_valor_produtos', template=PLOTLY_TEMPLATE, color_discrete_sequence=["#43e97b"])
+            fig_area.update_traces(line=dict(width=4, color='#43e97b'))
+        elif tipo_graf_tempo == "Colunas":
+            fig_area = px.bar(vendas_tempo, x='Mes_Ano', y='total_valor_produtos', template=PLOTLY_TEMPLATE, color_discrete_sequence=["#f5576c"])
 
-        fig_area = px.area(
-            timeline,
-            x="mes",
-            y="qtd",
-            title="📅 Pedidos por Mês",
-            template=PLOTLY_TEMPLATE,
-            color_discrete_sequence=["#667eea"],
-        )
-        fig_area.update_layout(
-            font=dict(family="Inter"),
-            margin=dict(t=60, b=40, l=20, r=20),
-            height=350,
-            xaxis_title="Mês",
-            yaxis_title="Quantidade de Pedidos",
-        )
-        fig_area.update_traces(
-            line=dict(width=3),
-            fillcolor="rgba(102, 126, 234, 0.15)",
-            hovertemplate="<b>%{x}</b><br>Pedidos: %{y}<extra></extra>"
-        )
+        fig_area.update_layout(xaxis_title="", yaxis_title="Faturamento Agregado (R$)")
         st.plotly_chart(fig_area, width="stretch")
 
 
 # ─────────────────────────────────────
-# 📦 ANÁLISE DE STATUS
+# 📈 Análise de Produtos
 # ─────────────────────────────────────
-elif pagina == "📦 Análise de Status":
-    st.markdown('<div class="section-title">📦 Análise Detalhada de Status</div>', unsafe_allow_html=True)
+elif pagina == "📈 Análise de Produtos":
+    st.markdown('<div class="section-title">🛒 Análise de Consumo (Por Estado e Vertical)</div>', unsafe_allow_html=True)
 
-    if df_filtrado.empty:
-        st.warning("⚠️ Nenhum dado encontrado com os filtros selecionados.")
+    col_1, col_2 = st.columns(2)
+
+    with col_1:
+         if not df_filtrado.empty and "categorias_produtos" in df_filtrado.columns:
+             cats = df_filtrado['categorias_produtos'].dropna().str.split(', ').explode()
+             cat_counts = cats.value_counts().head(15).reset_index()
+             cat_counts.columns = ['Categoria', 'Qtd_Vendida']
+             
+             fig_prod = px.bar(
+                 cat_counts.sort_values("Qtd_Vendida"), 
+                 x="Qtd_Vendida", 
+                 y="Categoria",
+                 orientation='h',
+                 title="📦 Top 15 Mix de Produtos Vendidos",
+                 template=PLOTLY_TEMPLATE,
+                 color="Qtd_Vendida",
+                 color_continuous_scale="Mint"
+             )
+             fig_prod.update_layout(coloraxis_showscale=False, yaxis_title="")
+             st.plotly_chart(fig_prod, width="stretch")
+
+    with col_2:
+        if not df_filtrado.empty and 'customer_state' in df_filtrado.columns:
+            estado_receita = df_filtrado.groupby('customer_state')['total_valor_produtos'].sum().reset_index()
+            fig_mapa_estadual = px.treemap(
+                estado_receita,
+                path=['customer_state'],
+                values='total_valor_produtos',
+                color='total_valor_produtos',
+                color_continuous_scale='Blues',
+                title="🗺️ Heatmap Nacional por Receita Tributada Bruta",
+                template=PLOTLY_TEMPLATE
+            )
+            fig_mapa_estadual.update_layout(margin=dict(t=50, l=25, r=25, b=25))
+            st.plotly_chart(fig_mapa_estadual, width="stretch")
+
+
+# ─────────────────────────────────────
+# 📍 Dispersão Geográfica
+# ─────────────────────────────────────
+elif pagina == "📍 Dispersão Geográfica":
+    st.markdown('<div class="section-title">📍 Mapa de Calor Direto: Clusters de Vendas Olist</div>', unsafe_allow_html=True)
+    
+    map_df = df_filtrado.dropna(subset=["customer_lat", "customer_lng"])
+    if map_df.empty:
+        st.warning("Problema ao extrair a Geolocalização do SQL AVG JOIN do DB Master.")
     else:
-        # Seletor de tipo de gráfico
-        tipo_grafico = st.selectbox(
-            "🎨 Tipo de Gráfico",
-            options=["Barras Verticais", "Barras Horizontais", "Pizza", "Donut", "Treemap", "Funil"],
-            index=0,
+        fig_map = px.scatter_map(
+            map_df,
+            lat="customer_lat",
+            lon="customer_lng",
+            zoom=3.5,
+            height=650,
+            map_style="carto-darkmatter",
+            color="order_status",
+            size="total_valor_produtos", 
+            size_max=18,
+            color_discrete_sequence=COLORS,
+            hover_data=["customer_city", "total_valor_produtos", "customer_state"],
+            template=PLOTLY_TEMPLATE,
         )
+        fig_map.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+        st.plotly_chart(fig_map, width="stretch")
 
-        status_counts = df_filtrado["order_status"].value_counts().reset_index()
-        status_counts.columns = ["status", "quantidade"]
 
-        if tipo_grafico == "Barras Verticais":
-            fig = px.bar(
-                status_counts,
-                x="status",
-                y="quantidade",
-                color="status",
-                color_discrete_sequence=COLORS,
-                template=PLOTLY_TEMPLATE,
-                title="📊 Status dos Pedidos - Barras Verticais",
-            )
-        elif tipo_grafico == "Barras Horizontais":
-            fig = px.bar(
-                status_counts.sort_values("quantidade"),
-                x="quantidade",
-                y="status",
-                orientation="h",
-                color="status",
-                color_discrete_sequence=COLORS,
-                template=PLOTLY_TEMPLATE,
-                title="📊 Status dos Pedidos - Barras Horizontais",
-            )
-        elif tipo_grafico == "Pizza":
-            fig = px.pie(
-                status_counts,
-                names="status",
-                values="quantidade",
-                color_discrete_sequence=COLORS,
-                template=PLOTLY_TEMPLATE,
-                title="🍕 Status dos Pedidos - Pizza",
-            )
-        elif tipo_grafico == "Donut":
-            fig = px.pie(
-                status_counts,
-                names="status",
-                values="quantidade",
-                hole=0.5,
-                color_discrete_sequence=COLORS,
-                template=PLOTLY_TEMPLATE,
-                title="🍩 Status dos Pedidos - Donut",
-            )
-        elif tipo_grafico == "Treemap":
-            fig = px.treemap(
-                status_counts,
-                path=["status"],
-                values="quantidade",
-                color="quantidade",
-                color_continuous_scale=["#764ba2", "#667eea", "#4facfe", "#43e97b"],
-                template=PLOTLY_TEMPLATE,
-                title="🌳 Status dos Pedidos - Treemap",
-            )
-        elif tipo_grafico == "Funil":
-            fig = px.funnel(
-                status_counts.sort_values("quantidade", ascending=False),
-                x="quantidade",
-                y="status",
-                color="status",
-                color_discrete_sequence=COLORS,
-                template=PLOTLY_TEMPLATE,
-                title="🔻 Status dos Pedidos - Funil",
-            )
+# ─────────────────────────────────────
+# 📋 Exportação de Dados (Nova GUI de Paginação e Rename)
+# ─────────────────────────────────────
+elif pagina == "📋 Exportação de Dados":
+    st.markdown('<div class="section-title">📋 Snapshot Bruto e Extração Automática</div>', unsafe_allow_html=True)
+    st.write("Acesso direto ao núcleo de dados consolidados. Configure seus limites para que não ocorra crash financeiro na memória.")
 
-        fig.update_layout(
-            font=dict(family="Inter"),
-            margin=dict(t=60, b=40, l=20, r=20),
-            height=500,
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
-        )
-        st.plotly_chart(fig, width="stretch")
-
-        # Tabela resumo
-        st.markdown('<div class="section-title">📋 Resumo Numérico</div>', unsafe_allow_html=True)
-
-        resumo = status_counts.copy()
-        resumo["percentual"] = (resumo["quantidade"] / resumo["quantidade"].sum() * 100).round(2)
-        resumo.columns = ["Status", "Quantidade", "Percentual (%)"]
-
-        st.dataframe(
-            resumo.style.format({"Percentual (%)": "{:.2f}%", "Quantidade": "{:,}"}),
-            width="stretch",
+    col1, col2 = st.columns([1.2, 1])
+    
+    with col1:
+        st.write("### 📝 Renomeador Master (Dê duplo clique)")
+        st.info("Para alterar os nomes das colunas que irão para o Excel/CSV, dê 2 cliques no novo nome antes de extrair.")
+        
+        # Traz as colunas dinamicamente
+        colunas_atuais = list(df_filtrado.columns)
+        df_colunas = pd.DataFrame({
+            "Coluna Original (Tabela)": colunas_atuais,
+            "Nome Final no CSV (Edite)": colunas_atuais
+        })
+        
+        # O Segredo: st.data_editor() que permite edição das celulas livremente!
+        df_editado_ui = st.data_editor(
+            df_colunas,
             hide_index=True,
+            disabled=["Coluna Original (Tabela)"], # Não deixa editar a da esquerda para n perder ref
+            width="stretch",
+            height=400
         )
 
+    with col2:
+        st.write("### 🚀 Engine de Extração Paginada")
+        tamanho_lote_ui = st.number_input("Tamanho Máximo do Lote em MB/RAM (Linhas):", min_value=1000, max_value=500000, value=50000, step=10000)
+        exportar_sql = st.toggle("Exportar no formato Banco de Dados (.sql)", value=False, help="Se ativo, converte para scripts INSERT automáticos.")
+        
+        if st.button("🔌 Ativar Pulling Paginado (Direto da DB)", type="primary", width="stretch"):
+            import math
+            import re
+            
+            # Buscando na raiz o SQL limpo
+            caminho_sql = os.path.join(os.path.dirname(__file__), "db", "queries", "query_informacoes.sql")
+            with open(caminho_sql, "r", encoding="utf-8") as f:
+                query_bruta = f.read()
+                
+            query_limpa = re.sub(r'(?i)\s+LIMIT\s+\d+\s*$', '', query_bruta.strip())
+            if query_limpa.endswith(';'): query_limpa = query_limpa[:-1]
 
-# ─────────────────────────────────────
-# 📍 MAPA GEOGRÁFICO
-# ─────────────────────────────────────
-elif pagina == "📍 Mapa Geográfico":
-    st.markdown('<div class="section-title">📍 Localização Geográfica</div>', unsafe_allow_html=True)
+            engine = get_engine()
+            
+            painel_alertas = st.empty()
+            painel_alertas.info("Contando volume arquitetural da DB...")
+            
+            # Step 1: Count()
+            query_count = f"SELECT COUNT(*) as total FROM (\n{query_limpa}\n) as db_temp;"
+            total_linhas = pd.read_sql(query_count, con=engine).iloc[0,0]
+            
+            qtd_partes = math.ceil(total_linhas / tamanho_lote_ui)
+            
+            barra_progresso = st.progress(0)
+            
+            st.success(f"**Volume Oficial Detectado:** {total_linhas:,} linhas.")
+            st.write(f"O Streamlit fragmentará e juntará a db em **{qtd_partes} lote(s)**.")
+            
+            # Step 2: Extracting (Assim como no bot.py)
+            pedacos = []
+            for i in range(qtd_partes):
+                offset = i * tamanho_lote_ui
+                painel_alertas.warning(f"Engajando Lote {i+1} de {qtd_partes}...")
+                q_part = f"{query_limpa}\nLIMIT {tamanho_lote_ui} OFFSET {offset}"
+                
+                df_part = pd.read_sql(q_part, con=engine)
+                pedacos.append(df_part)
+                barra_progresso.progress((i + 1) / qtd_partes)
+                
+            painel_alertas.info("Montando DataFrame master em RAM e convertendo as colunas Editadas...")
+            df_final_export = pd.concat(pedacos, ignore_index=True)
+            
+            # Aplica o truque da Interface para Renomear
+            dicionario_renomeio = dict(zip(df_editado_ui["Coluna Original (Tabela)"], df_editado_ui["Nome Final no CSV (Edite)"]))
+            df_final_export.rename(columns=dicionario_renomeio, inplace=True)
+            
+            # Converte e prepara o formato de saída
+            painel_alertas.info("Preparando formato de saída do Dataframe final...")
+            
+            if exportar_sql:
+                def escape_sql_it(val):
+                    if pd.isna(val): return "NULL"
+                    if isinstance(val, (int, float)): return str(val)
+                    return "'" + str(val).replace("'", "''") + "'"
 
-    if df_filtrado.empty:
-        st.warning("⚠️ Nenhum dado encontrado com os filtros selecionados.")
-    else:
-        # Seletor de estilo do mapa com nomes amigáveis
-        estilos_mapa = {
-            "🌙 Mapa Escuro": "carto-darkmatter",
-            "☀️ Mapa Claro": "carto-positron",
-        }
-        estilo_escolhido = st.selectbox(
-            "🗺️ Estilo do Mapa",
-            options=list(estilos_mapa.keys()),
-            index=0,
-        )
-        estilo_mapa = estilos_mapa[estilo_escolhido]
-
-        map_df = df_filtrado.dropna(subset=["customer_lat", "customer_lng"])
-        if map_df.empty:
-            st.info("ℹ️ Sem dados de localização disponíveis.")
-        else:
-            fig_map = px.scatter_map(
-                map_df,
-                lat="customer_lat",
-                lon="customer_lng",
-                zoom=3,
-                height=600,
-                map_style=estilo_mapa,
-                color="order_status",
-                color_discrete_sequence=COLORS,
-                hover_data=["order_status"],
-                title="📍 Localização dos Pedidos",
-                template=PLOTLY_TEMPLATE,
-            )
-            fig_map.update_layout(
-                font=dict(family="Inter"),
-                margin=dict(t=60, b=20, l=0, r=0),
-            )
-            st.plotly_chart(fig_map, width="stretch")
-
-        # Estatísticas do mapa
-        with st.expander("📊 Estatísticas de Localização", expanded=False):
-            pontos_no_mapa = df_filtrado.dropna(subset=["customer_lat", "customer_lng"]).shape[0]
-            st.metric("Pontos com localização", f"{pontos_no_mapa:,}")
-
-
-# ─────────────────────────────────────
-# 📅 HISTÓRICO TEMPORAL
-# ─────────────────────────────────────
-elif pagina == "📅 Histórico Temporal":
-    st.markdown('<div class="section-title">📅 Análise Temporal</div>', unsafe_allow_html=True)
-
-    if df_filtrado.empty or "order_purchase_timestamp" not in df_filtrado.columns:
-        st.warning("⚠️ Nenhum dado temporal encontrado.")
-    else:
-        df_temp = df_filtrado.dropna(subset=["order_purchase_timestamp"]).copy()
-
-        if df_temp.empty:
-            st.warning("⚠️ Nenhum dado com data válida.")
-        else:
-            # Seletor de granularidade
-            granularidade = st.selectbox(
-                "⏱️ Granularidade Temporal",
-                options=["Diário", "Semanal", "Mensal"],
-                index=2,
-            )
-
-            if granularidade == "Diário":
-                df_temp["periodo"] = df_temp["order_purchase_timestamp"].dt.date
-            elif granularidade == "Semanal":
-                df_temp["periodo"] = df_temp["order_purchase_timestamp"].dt.to_period("W").astype(str)
+                columns_sql = ", ".join([f"`{c}`" for c in df_final_export.columns])
+                sql_linhas = []
+                for tupla in df_final_export.itertuples(index=False, name=None):
+                    vals = ", ".join(escape_sql_it(x) for x in tupla)
+                    sql_linhas.append(f"INSERT INTO tabela_exportada ({columns_sql}) VALUES ({vals});")
+                    
+                dados_prontos = "\\n".join(sql_linhas).encode('utf-8')
+                tipo_mime = "application/sql"
+                nome_arq = "extracao_paginada.sql"
+                txt_botao = "✅ [CLIQUE AQUI] Download da Base Massiva (.sql Otimizado)"
             else:
-                df_temp["periodo"] = df_temp["order_purchase_timestamp"].dt.to_period("M").astype(str)
-
-            timeline = df_temp.groupby("periodo").size().reset_index(name="qtd")
-            timeline["periodo"] = timeline["periodo"].astype(str)
-
-            # Seletor tipo de gráfico temporal
-            tipo_temporal = st.radio(
-                "📈 Tipo de visualização",
-                options=["Linha", "Área", "Barras"],
-                horizontal=True,
-            )
-
-            if tipo_temporal == "Linha":
-                fig_time = px.line(
-                    timeline,
-                    x="periodo",
-                    y="qtd",
-                    markers=True,
-                    title=f"📈 Pedidos - Visão {granularidade}",
-                    template=PLOTLY_TEMPLATE,
-                    color_discrete_sequence=["#667eea"],
-                )
-                fig_time.update_traces(line=dict(width=3))
-            elif tipo_temporal == "Área":
-                fig_time = px.area(
-                    timeline,
-                    x="periodo",
-                    y="qtd",
-                    title=f"📈 Pedidos - Visão {granularidade}",
-                    template=PLOTLY_TEMPLATE,
-                    color_discrete_sequence=["#667eea"],
-                )
-                fig_time.update_traces(
-                    line=dict(width=3),
-                    fillcolor="rgba(102, 126, 234, 0.2)",
-                )
-            else:
-                fig_time = px.bar(
-                    timeline,
-                    x="periodo",
-                    y="qtd",
-                    title=f"📊 Pedidos - Visão {granularidade}",
-                    template=PLOTLY_TEMPLATE,
-                    color="qtd",
-                    color_continuous_scale=["#764ba2", "#667eea", "#4facfe"],
-                )
-                fig_time.update_layout(coloraxis_showscale=False)
-
-            fig_time.update_layout(
-                font=dict(family="Inter"),
-                margin=dict(t=60, b=40, l=20, r=20),
-                height=450,
-                xaxis_title="Período",
-                yaxis_title="Quantidade de Pedidos",
-            )
-            fig_time.update_traces(
-                hovertemplate="<b>%{x}</b><br>Pedidos: %{y}<extra></extra>"
-            )
-            st.plotly_chart(fig_time, width="stretch")
-
-            # Gráfico de status ao longo do tempo
-            st.markdown('<div class="section-title">📊 Status ao Longo do Tempo</div>', unsafe_allow_html=True)
-
-            timeline_status = (
-                df_temp
-                .groupby(["periodo", "order_status"])
-                .size()
-                .reset_index(name="qtd")
-            )
-            timeline_status["periodo"] = timeline_status["periodo"].astype(str)
-
-            fig_stack = px.bar(
-                timeline_status,
-                x="periodo",
-                y="qtd",
-                color="order_status",
-                title="📊 Composição de Status por Período",
-                template=PLOTLY_TEMPLATE,
-                color_discrete_sequence=COLORS,
-                barmode="stack",
-            )
-            fig_stack.update_layout(
-                font=dict(family="Inter"),
-                margin=dict(t=60, b=40, l=20, r=20),
-                height=450,
-                xaxis_title="Período",
-                yaxis_title="Quantidade",
-                legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-            )
-            st.plotly_chart(fig_stack, width="stretch")
-
-
-# ─────────────────────────────────────
-# 📋 DADOS BRUTOS
-# ─────────────────────────────────────
-elif pagina == "📋 Dados Brutos":
-    st.markdown('<div class="section-title">📋 Explorador de Dados</div>', unsafe_allow_html=True)
-
-    if df_filtrado.empty:
-        st.warning("⚠️ Nenhum dado encontrado com os filtros selecionados.")
-    else:
-        # Seletor de colunas
-        todas_colunas = df_filtrado.columns.tolist()
-        colunas_selecionadas = st.multiselect(
-            "📑 Selecionar Colunas para Exibir",
-            options=todas_colunas,
-            default=todas_colunas[:8] if len(todas_colunas) > 8 else todas_colunas,
-        )
-
-        if colunas_selecionadas:
-            # Pesquisa
-            busca = st.text_input("🔍 Pesquisar nos dados", placeholder="Digite para filtrar...")
-
-            df_display = df_filtrado[colunas_selecionadas].copy()
-
-            if busca:
-                mask = df_display.astype(str).apply(
-                    lambda col: col.str.contains(busca, case=False, na=False)
-                ).any(axis=1)
-                df_display = df_display[mask]
-
-            st.markdown(f"**Exibindo {len(df_display):,} de {len(df_filtrado):,} registros**")
-
-            st.dataframe(
-                df_display,
-                width="stretch",
-                height=500,
-            )
-
-            # Botão para download
-            csv = df_display.to_csv(index=False).encode("utf-8")
+                dados_prontos = df_final_export.to_csv(index=False).encode('utf-8')
+                tipo_mime = "text/csv"
+                nome_arq = "extracao_paginada.csv"
+                txt_botao = "✅ [CLIQUE AQUI] Download da Base Massiva (.csv)"
+            
+            painel_alertas.empty()
+            st.toast('Sua carga está pronta!', icon='😍')
+            
+            # Libera o Download Otimizado na tela
             st.download_button(
-                label="⬇️ Baixar CSV",
-                data=csv,
-                file_name="dados_filtrados.csv",
-                mime="text/csv",
-                width="stretch",
+                label=txt_botao,
+                data=dados_prontos,
+                file_name=nome_arq,
+                mime=tipo_mime,
                 type="primary",
+                width="stretch"
             )
-        else:
-            st.info("ℹ️ Selecione ao menos uma coluna para visualizar.")
-
 
 # =========================
 # FOOTER
 # =========================
 st.markdown("""
-<div class="footer">
-    <p>📊 Dashboard de Pedidos • Desenvolvido por Alef B.R. /Opus 4.6(thinking) com Streamlit & Plotly • Dados em tempo real</p>
+<div class="footer" style="margin-top: 50px; text-align: center; color: rgba(255,255,255,0.4); font-size: 0.8rem;">
+    <p>Olist Analytics Master Console • Dados fornecidos diretamente da DB via Query Oficial Mapeada</p>
+    <p>Desenvolvido por <strong>Alef Barbosa</strong></p>
 </div>
 """, unsafe_allow_html=True)

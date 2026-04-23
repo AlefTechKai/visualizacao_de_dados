@@ -1,3 +1,8 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.stdout.reconfigure(encoding='utf-8')
+
 from db.conexao_db import get_connection
 from funcoes.api import buscar_dados_api
 

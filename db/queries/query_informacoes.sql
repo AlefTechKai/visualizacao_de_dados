@@ -3,7 +3,7 @@
 -- ========================================================================================
 -- a) olist_orders_dataset: Tabela Core. Contém o status do pedido e timestamps vitais.
 -- b) olist_order_items_dataset: Detalhes dos itens de cada pedido.
--- c) olist_customers_dataset: Dimensão. Dados geográficos e de perfil de quem comprou.
+-- c) olist_order_customer_dataset: Dimensão. Dados geográficos e de perfil de quem comprou.
 -- d) olist_products_dataset: Dimensão. O catálogo de produtos.
 -- e) olist_sellers_dataset: Dimensão. Quem vendeu (o marketplace).
 -- f) olist_order_payments_dataset: Como foi pago. Relaciona por order_id.
@@ -27,7 +27,7 @@ SELECT
 FROM olist_orders_dataset o
 
 -- 1. Juntando com Cliente (1 para 1 no contexto da compra)
-LEFT JOIN olist_customers_dataset c 
+LEFT JOIN olist_order_customer_dataset c 
     ON o.customer_id = c.customer_id
 
 -- 2. Juntando com Itens do Pedido (1 para N)

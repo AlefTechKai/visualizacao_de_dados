@@ -187,19 +187,19 @@ st.markdown(f"""
 <div class="kpi-container">
     <div class="kpi-card kpi-1">
         <div class="kpi-label">Volume de Pedidos</div>
-        <div class="kpi-value">{total_pedidos:,}</div>
+        <div class="kpi-value">{f"{total_pedidos:,}".replace(',', '.')}</div>
     </div>
     <div class="kpi-card kpi-2">
         <div class="kpi-label">Faturamento Total Bruto</div>
-        <div class="kpi-value">R$ {faturamento_total:,.2f}</div>
+        <div class="kpi-value">R$ {f"{faturamento_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')}</div>
     </div>
     <div class="kpi-card kpi-3">
         <div class="kpi-label">Ticket Médio por Pedido</div>
-        <div class="kpi-value">R$ {ticket_medio:,.2f}</div>
+        <div class="kpi-value">R$ {f"{ticket_medio:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')}</div>
     </div>
     <div class="kpi-card kpi-4">
         <div class="kpi-label">Custo Total Logística</div>
-        <div class="kpi-value">R$ {frete_total:,.2f}</div>
+        <div class="kpi-value">R$ {f"{frete_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -291,43 +291,80 @@ if pagina == "🏠 Visão Executiva":
 # 📈 Análise de Produtos
 # ─────────────────────────────────────
 elif pagina == "📈 Análise de Produtos":
-    st.markdown('<div class="section-title">🛒 Análise de Consumo (Por Estado e Vertical)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🛒 Análise de Consumo (Categorias)</div>', unsafe_allow_html=True)
 
-    col_1, col_2 = st.columns(2)
-
-    with col_1:
-         if not df_filtrado.empty and "categorias_produtos" in df_filtrado.columns:
-             cats = df_filtrado['categorias_produtos'].dropna().str.split(', ').explode()
-             cat_counts = cats.value_counts().head(15).reset_index()
-             cat_counts.columns = ['Categoria', 'Qtd_Vendida']
-             
-             fig_prod = px.bar(
-                 cat_counts.sort_values("Qtd_Vendida"), 
-                 x="Qtd_Vendida", 
-                 y="Categoria",
-                 orientation='h',
-                 title="📦 Top 15 Mix de Produtos Vendidos",
-                 template=PLOTLY_TEMPLATE,
-                 color="Qtd_Vendida",
-                 color_continuous_scale="Mint"
-             )
-             fig_prod.update_layout(coloraxis_showscale=False, yaxis_title="")
-             st.plotly_chart(fig_prod, width="stretch")
-
-    with col_2:
-        if not df_filtrado.empty and 'customer_state' in df_filtrado.columns:
-            estado_receita = df_filtrado.groupby('customer_state')['total_valor_produtos'].sum().reset_index()
-            fig_mapa_estadual = px.treemap(
-                estado_receita,
-                path=['customer_state'],
-                values='total_valor_produtos',
-                color='total_valor_produtos',
-                color_continuous_scale='Blues',
-                title="🗺️ Heatmap Nacional por Receita Tributada Bruta",
-                template=PLOTLY_TEMPLATE
+    if not df_filtrado.empty and "categorias_produtos" in df_filtrado.columns:
+        cats = df_filtrado['categorias_produtos'].dropna().str.split(', ').explode()
+        cat_counts = cats.value_counts().reset_index()
+        cat_counts.columns = ['Categoria', 'Qtd_Vendida']
+        
+        col_grafico, col_metricas = st.columns([2.5, 1])
+        
+        with col_grafico:
+            filtro_produtos = st.radio(
+                "Filtro de Ranking:",
+                options=["Todos os produtos", "Mais vendidos (10)", "Menos vendidos (10)"],
+                horizontal=True
             )
-            fig_mapa_estadual.update_layout(margin=dict(t=50, l=25, r=25, b=25))
-            st.plotly_chart(fig_mapa_estadual, width="stretch")
+            
+            if filtro_produtos == "Mais vendidos (10)":
+                df_render = cat_counts.head(10)
+            elif filtro_produtos == "Menos vendidos (10)":
+                df_render = cat_counts.tail(10)
+            else:
+                df_render = cat_counts
+                
+            fig_prod = px.bar(
+                df_render.sort_values("Qtd_Vendida"), 
+                x="Qtd_Vendida", 
+                y="Categoria",
+                orientation='h',
+                template=PLOTLY_TEMPLATE,
+                color="Qtd_Vendida",
+                color_continuous_scale="Mint"
+            )
+            
+            altura_grafico = max(400, len(df_render) * 30)
+            fig_prod.update_layout(coloraxis_showscale=False, yaxis_title="", height=altura_grafico)
+            
+            st.plotly_chart(fig_prod, use_container_width=True)
+
+        with col_metricas:
+            import re
+            categorias_presentes = df_render['Categoria'].tolist()
+            
+            if categorias_presentes:
+                # Utilizamos regex simples para testar contensão em pelo menos 1 categoria do bloco
+                regex_cat = '|'.join([re.escape(cat) for cat in categorias_presentes])
+                df_kpi_cat = df_filtrado[df_filtrado['categorias_produtos'].str.contains(regex_cat, regex=True, na=False)]
+            else:
+                df_kpi_cat = pd.DataFrame()
+            
+            vol_itens = len(df_kpi_cat)
+            fat_itens = df_kpi_cat["total_valor_produtos"].sum() if not df_kpi_cat.empty else 0
+            frete_itens = df_kpi_cat["total_valor_frete"].sum() if not df_kpi_cat.empty else 0
+            tm_itens = (fat_itens / vol_itens) if vol_itens > 0 else 0
+            
+            st.markdown(f"""
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+                <div class="kpi-card kpi-1" style="min-height: 100px; padding: 1.5rem;">
+                    <div class="kpi-label">Volume (Pedidos)</div>
+                    <div class="kpi-value" style="font-size: 1.6rem;">{f"{vol_itens:,}".replace(',', '.')}</div>
+                </div>
+                <div class="kpi-card kpi-2" style="min-height: 100px; padding: 1.5rem;">
+                    <div class="kpi-label">Faturamento</div>
+                    <div class="kpi-value" style="font-size: 1.6rem;">R$ {f"{fat_itens:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')}</div>
+                </div>
+                <div class="kpi-card kpi-3" style="min-height: 100px; padding: 1.5rem;">
+                    <div class="kpi-label">Ticket Médio</div>
+                    <div class="kpi-value" style="font-size: 1.6rem;">R$ {f"{tm_itens:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')}</div>
+                </div>
+                <div class="kpi-card kpi-4" style="min-height: 100px; padding: 1.5rem;">
+                    <div class="kpi-label">Custo Logística</div>
+                    <div class="kpi-value" style="font-size: 1.6rem;">R$ {f"{frete_itens:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────

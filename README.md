@@ -163,11 +163,12 @@ python main.py
 | 📊 **Visão Geral** | KPIs dinâmicos, ranking de cidades por faturamento e análise de status |
 | 📦 **Visualização Dinâmica** | Alternância em tempo real entre gráficos de Barras, Pizza, Donut, Treemap e Funil |
 | 📍 **Dispersão Geográfica** | Mapa de Calor de vendas utilizando as geolocalizações originais |
+| 💡 **Insights Investigativos** | Avaliação analítica com cruzamento cruzado de KPIs diretos no MySQL (Recompra, NPS x Atraso, Cubagem vs Frete, Conversão por Imagens) |
 | 📅 **Histórico Temporal** | Linha do tempo com opções de visualização (Área, Linhas ou Colunas) 100% cronológica |
 | 📋 **Dados Brutos (Exportação)** | Painel massivo paginado com opção de renomear colunas dinamicamente |
 | 🎛️ **Filtros Avançados** | Filtros globais por Status, Estado e filtro de Ano de análise |
 | ⬇️ **Exportação Massiva** | Download otimizado e paginado para `.csv` ou scripts `.sql` gerados automaticamente |
-| 🎨 **Design Moderno** | Interface premium com *Glassmorphism*, gradientes vibrantes e visual não-opaco |
+| 🎨 **Design & UX** | Interface premium em português nativo (R$ e formato numérico) com *Glassmorphism*, gradientes vibrantes estilo moderno |
 
 ---
 

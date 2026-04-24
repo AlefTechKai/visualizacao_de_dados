@@ -108,6 +108,7 @@ with st.sidebar:
             "🏠 Visão Executiva",
             "📈 Análise de Produtos",
             "📍 Dispersão Geográfica",
+            "💡 Insights Investigativos",
             "📋 Exportação de Dados"
         ],
         index=0
@@ -393,6 +394,103 @@ elif pagina == "📍 Dispersão Geográfica":
         )
         fig_map.update_layout(margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig_map, width="stretch")
+
+
+# ─────────────────────────────────────
+# 💡 Insights Investigativos
+# ─────────────────────────────────────
+elif pagina == "💡 Insights Investigativos":
+    st.markdown('<div class="section-title">💡 Respostas Analíticas (Insights)</div>', unsafe_allow_html=True)
+    st.write("Processando cruzamento massivo direto no repositório de dados. Aguarde os cálculos...")
+    
+    with st.spinner("Minerando insights no MySQL..."):
+        engine = get_engine()
+        
+        # Q1
+        q1 = "SELECT AVG(DATEDIFF(order_delivered_customer_date, order_approved_at)) as avg_days FROM olist_orders_dataset WHERE order_delivered_customer_date IS NOT NULL"
+        df1 = pd.read_sql(q1, engine)
+        tempo_medio = round(df1.iloc[0,0], 1) if not df1.empty and pd.notna(df1.iloc[0,0]) else 0
+
+        # Q2
+        q2_vendas = "SELECT DATE_FORMAT(order_purchase_timestamp, '%%Y-%%m') as mes, COUNT(order_id) as vendas FROM olist_orders_dataset GROUP BY mes ORDER BY vendas DESC LIMIT 1"
+        q2_pags = "SELECT DATE_FORMAT(o.order_purchase_timestamp, '%%Y-%%m') as mes, sum(p.payment_value) as pagamentos FROM olist_orders_dataset o JOIN olist_order_payments_dataset p ON o.order_id = p.order_id GROUP BY mes ORDER BY pagamentos DESC LIMIT 1"
+        m_vendas = pd.read_sql(q2_vendas, engine).iloc[0]['mes']
+        m_pags = pd.read_sql(q2_pags, engine).iloc[0]['mes']
+
+        # Q3
+        q3 = "SELECT AVG(review_score) as avg_score, SUM(CASE WHEN review_comment_message IS NOT NULL AND review_comment_message != '' THEN 1 ELSE 0 END) / COUNT(*) * 100 as perc_comentarios FROM olist_order_reviews_dataset"
+        df3 = pd.read_sql(q3, engine)
+        score_geral = df3.iloc[0]['avg_score']
+        perc_coment = df3.iloc[0]['perc_comentarios']
+
+        # Q4
+        q4 = "SELECT CASE WHEN o.order_delivered_customer_date > o.order_estimated_delivery_date THEN 'Atrasado' ELSE 'No Prazo' END as status_entrega, AVG(r.review_score) as avg_score FROM olist_orders_dataset o JOIN olist_order_reviews_dataset r ON o.order_id = r.order_id WHERE o.order_delivered_customer_date IS NOT NULL GROUP BY status_entrega"
+        df4 = pd.read_sql(q4, engine)
+
+        # Q5, Q6, Q7
+        q5 = "SELECT p.product_category_name as categoria, COUNT(i.order_item_id) as vendas, AVG(i.price) as preco_medio FROM olist_order_items_dataset i JOIN olist_products_dataset p ON i.product_id = p.product_id GROUP BY p.product_category_name ORDER BY vendas DESC"
+        df5 = pd.read_sql(q5, engine).dropna()
+
+        # Q8: Fotos / Q9: Volume peso
+        q_fotos = "SELECT p.product_photos_qty, COUNT(i.order_item_id) as vendas FROM olist_products_dataset p JOIN olist_order_items_dataset i ON p.product_id = i.product_id GROUP BY p.product_photos_qty"
+        df_fotos = pd.read_sql(q_fotos, engine).dropna()
+        
+        q_frete = "SELECT (p.product_length_cm * p.product_height_cm * p.product_width_cm) as volume_cm3, p.product_weight_g as peso, i.freight_value as frete FROM olist_products_dataset p JOIN olist_order_items_dataset i ON p.product_id = i.product_id ORDER BY RAND() LIMIT 2000"
+        df_frete = pd.read_sql(q_frete, engine)
+
+        # Q10 Atrasos por Estado e Geo Max
+        q_geo1 = "SELECT customer_state as estado, COUNT(customer_id) as clientes FROM olist_order_customer_dataset GROUP BY customer_state ORDER BY clientes DESC LIMIT 1"
+        q_geo2 = "SELECT seller_state as estado, COUNT(seller_id) as vendedores FROM olist_sellers_dataset GROUP BY seller_state ORDER BY vendedores DESC LIMIT 1"
+        est_clientes = pd.read_sql(q_geo1, engine).iloc[0]['estado']
+        est_vendedores = pd.read_sql(q_geo2, engine).iloc[0]['estado']
+
+        q_atrasos = "SELECT c.customer_state as estado_cliente, s.seller_state as estado_vendedor, COUNT(o.order_id) as qtd_atrasos FROM olist_orders_dataset o JOIN olist_order_customer_dataset c ON o.customer_id = c.customer_id JOIN olist_order_items_dataset i ON o.order_id = i.order_id JOIN olist_sellers_dataset s ON i.seller_id = s.seller_id WHERE o.order_delivered_customer_date > o.order_estimated_delivery_date GROUP BY c.customer_state, s.seller_state ORDER BY qtd_atrasos DESC LIMIT 10"
+        df_atrasos = pd.read_sql(q_atrasos, engine)
+
+        # Q11 Recompra
+        q_recomp = "WITH repetidos AS (SELECT customer_unique_id, COUNT(customer_id) as qtd_compras FROM olist_order_customer_dataset GROUP BY customer_unique_id HAVING qtd_compras > 1) SELECT c.customer_state as estado, COUNT(r.customer_unique_id) as clientes_recompra FROM repetidos r JOIN olist_order_customer_dataset c ON r.customer_unique_id = c.customer_unique_id GROUP BY c.customer_state ORDER BY clientes_recompra DESC LIMIT 5"
+        df_recomp = pd.read_sql(q_recomp, engine)
+        
+    st.markdown("### 👁️‍🗨️ Respostas Diretas")
+    
+    colA, colB = st.columns(2)
+    with colA:
+        st.info(f"**⏳ Tempo Logístico:** O tempo médio despendido da aprovação à entrega foi de **{tempo_medio} dias**.")
+        st.info(f"**📈 Picos Sales/Receita:** Mês com mais pedidos e mês com maior fluxo de pagamento batem no topo: **{m_vendas}** e **{m_pags}**.") 
+        st.info(f"**⭐ Score de CSAT:** Média global de **{score_geral:.1f}** estrelas. **{perc_coment:.1f}%** dos usuários registraram avaliação comentada.")
+        st.info(f"**🌎 Oásis Demográfico:** Maior hub de clientes localiza-se em **{est_clientes}**, que também concentra a maior fatia de lojistas (**{est_vendedores}**).")
+    with colB:    
+        st.dataframe(df4.rename(columns={'status_entrega': 'SLA de Entrega', 'avg_score': 'Nota Média'}), use_container_width=True, hide_index=True)
+        st.caption("Correlação: O atingimento da Previsão SLA dita severamente a nota final.")
+
+    st.markdown("---")
+    
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("**🛒 Top Mais Vendidos / Preço**")
+        st.dataframe(df5.head(10).rename(columns={'categoria': 'Categoria'}), hide_index=True)
+    with c2:
+        st.markdown("**📉 Top Menos Vendidos / Preço**")
+        st.dataframe(df5.tail(10).rename(columns={'categoria': 'Categoria'}), hide_index=True)
+    with c3:
+        st.markdown("**🔄 Onde Ocorre Recompra?**")
+        st.dataframe(df_recomp, hide_index=True)
+        
+    st.markdown("---")
+    
+    ca, cb = st.columns(2)
+    with ca:
+        st.markdown("**📸 Qtd_Fotos vs Volume de Pedidos**")
+        fig_pic = px.bar(df_fotos.sort_values("product_photos_qty"), x="product_photos_qty", y="vendas", template=PLOTLY_TEMPLATE, color_discrete_sequence=["#f093fb"])
+        st.plotly_chart(fig_pic, use_container_width=True)
+    with cb:
+        st.markdown("**🚚 Peso/Volume vs Valor Custeio Frete**")
+        fig_frete = px.scatter(df_frete, x="peso", y="frete", size="volume_cm3", color="frete", template=PLOTLY_TEMPLATE, color_continuous_scale="Mint")
+        st.plotly_chart(fig_frete, use_container_width=True)
+        
+    st.markdown("### ⚠️ Hubs de Atrasos Extremos (Cross-State)")
+    st.write("Cruzamentos Estaduais (Destino vs Remetente) com mais atrasos:")
+    st.dataframe(df_atrasos, use_container_width=True, hide_index=True)
 
 
 # ─────────────────────────────────────
